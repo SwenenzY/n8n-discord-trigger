@@ -253,21 +253,28 @@ export class DiscordInteraction implements INodeType {
 
                 if (nodeParameters.channelId || nodeParameters.executionId) {
                     // return the interaction result if there is one
-                    const res: any = await new Promise((resolve) => {
+                    const res: any = await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            reject(new Error('IPC timeout after 30 seconds'));
+                        }, 30000);
+
                         ipc.config.retry = 1500;
                         configureIpc();
                         ipc.connectTo('bot', () => {
                             const type = `send:${nodeParameters.type}`;
                             ipc.of.bot.on(`callback:${type}`, (data: any) => {
+                                clearTimeout(timeout);
+                                console.log('Received callback:', type, data);
                                 resolve(data);
                             });
 
                             // send event to bot
+                            console.log('Emitting event:', type, nodeParameters);
                             ipc.of.bot.emit(type, {token: credentials.token, nodeParameters:nodeParameters});
                         });
                     }).catch((e) => {
-                        console.log(e);
-                        return this.prepareOutputData(this.getInputData());
+                        console.log('IPC Error:', e);
+                        return null;
                     });
 
                     // Handle getMessages response with multiple messages

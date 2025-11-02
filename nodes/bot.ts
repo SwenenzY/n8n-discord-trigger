@@ -712,20 +712,27 @@ export default function () {
 
         ipc.server.on( 'send:action', async ( data: { token: string, nodeParameters: IDiscordNodeActionParameters }, socket: any ) => {
             try {
+                console.log( 'Received send:action:', data.nodeParameters.actionType );
                 const client = settings.clientMap[ data.token ];
                 const nodeParameters = data.nodeParameters;
-                if ( !client || !settings.readyClients[ data.token ] ) return;
+                if ( !client || !settings.readyClients[ data.token ] ) {
+                    console.log( 'Client not ready or not found' );
+                    return;
+                }
 
                 const performAction = async (): Promise<string | void> => {
                     // get messages from channel
                     if ( nodeParameters.actionType === 'getMessages' ) {
+                        console.log( 'Processing getMessages action' );
                         const channel = <TextChannel> client.channels.cache.get( nodeParameters.channelId );
                         if ( !channel || !channel.isTextBased() ) {
+                            console.log( 'Channel not found or not text-based' );
                             ipc.server.emit( socket, `callback:send:action`, false );
                             return 'handled';
                         }
 
                         const limit = ( nodeParameters as any ).getMessagesLimit || 10;
+                        console.log( `Fetching ${limit} messages from channel ${nodeParameters.channelId}` );
                         const messages = await channel.messages.fetch( { limit } );
 
                         const messagesArray = Array.from( messages.values() ).map( ( msg: Message ) => ( {
@@ -769,10 +776,12 @@ export default function () {
                             } ) ) : [],
                         } ) );
 
+                        console.log( `Emitting callback with ${messagesArray.length} messages` );
                         ipc.server.emit( socket, `callback:send:action`, {
                             action: 'getMessages',
                             messages: messagesArray,
                         } );
+                        console.log( 'Callback emitted successfully' );
                         return 'handled';
                     }
 

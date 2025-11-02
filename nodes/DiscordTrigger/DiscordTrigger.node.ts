@@ -132,7 +132,7 @@ export class DiscordTrigger implements INodeType {
                 nodeId: this.getNode().id, // Unique to each node
             });
 
-            ipc.of.bot.on('messageCreate', ({ message, author, guild, nodeId, messageReference, attachments, referenceAuthor }: any) => {
+            ipc.of.bot.on('messageCreate', ({ message, author, guild, nodeId, messageReference, attachments, referenceAuthor, memberRoles }: any) => {
                 if( this.getNode().id === nodeId) {
                     console.log("received messageCreate event", message.id);
 
@@ -146,6 +146,7 @@ export class DiscordTrigger implements INodeType {
                         timestamp: message.createdTimestamp,
                         listenValue: this.getNodeParameter('value', ''),
                         authorIsBot: author.bot || author.system,
+                        memberRoles: memberRoles || [],
                         referenceId: null,
                         referenceContent: null,
                         referenceAuthorId: null,

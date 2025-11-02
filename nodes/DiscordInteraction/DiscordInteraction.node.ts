@@ -270,17 +270,29 @@ export class DiscordInteraction implements INodeType {
                         return this.prepareOutputData(this.getInputData());
                     });
 
-                    returnData.push({
-                        json: {
-                            value: res?.value,
-                            channelId: res?.channelId,
-                            userId: res?.userId,
-                            userName: res?.userName,
-                            userTag: res?.userTag,
-                            messageId: res?.messageId,
-                            action: res?.action,
-                        },
-                    });
+                    // Handle getMessages response with multiple messages
+                    if (res?.action === 'getMessages' && res?.messages) {
+                        // Return each message as a separate item
+                        res.messages.forEach((message: any) => {
+                            returnData.push({
+                                json: message,
+                            });
+                        });
+                    } else {
+                        // Handle other actions normally
+                        returnData.push({
+                            json: {
+                                value: res?.value,
+                                channelId: res?.channelId,
+                                userId: res?.userId,
+                                userName: res?.userName,
+                                userTag: res?.userTag,
+                                messageId: res?.messageId,
+                                action: res?.action,
+                                ...res,
+                            },
+                        });
+                    }
                 }
             }
 

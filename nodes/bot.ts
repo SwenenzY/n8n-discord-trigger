@@ -716,13 +716,13 @@ export default function () {
                 const nodeParameters = data.nodeParameters;
                 if ( !client || !settings.readyClients[ data.token ] ) return;
 
-                const performAction = async () => {
+                const performAction = async (): Promise<string | void> => {
                     // get messages from channel
                     if ( nodeParameters.actionType === 'getMessages' ) {
                         const channel = <TextChannel> client.channels.cache.get( nodeParameters.channelId );
                         if ( !channel || !channel.isTextBased() ) {
                             ipc.server.emit( socket, `callback:send:action`, false );
-                            return;
+                            return 'handled';
                         }
 
                         const limit = ( nodeParameters as any ).getMessagesLimit || 10;
@@ -773,7 +773,7 @@ export default function () {
                             action: 'getMessages',
                             messages: messagesArray,
                         } );
-                        return;
+                        return 'handled';
                     }
 
                     // remove messages
@@ -810,7 +810,13 @@ export default function () {
                     }
                 };
 
-                await performAction();
+                const actionResult = await performAction();
+
+                // If action already sent response (like getMessages), don't send again
+                if (actionResult === 'handled') {
+                    return;
+                }
+
                 console.log( "action done" );
 
                 ipc.server.emit( socket, `callback:send:action`, {

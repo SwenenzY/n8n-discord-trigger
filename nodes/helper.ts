@@ -157,6 +157,57 @@ export interface IRole {
     id: string;
 }
 
+export const getCategories = async (that: any, selectedGuildIds: string[]): Promise<INodePropertyOptions[]> => {
+    const endMessage = ' - Close and reopen this node modal once you have made changes.';
+
+    const credentials = await that.getCredentials('discordBotTriggerApi').catch((e: any) => e);
+    const res = await connection(credentials).catch((e) => e);
+    if (!['ready', 'already'].includes(res)) {
+        return [
+            {
+                name: res + endMessage,
+                value: 'false',
+            },
+        ];
+    }
+
+    const categoriesRequest = () =>
+        new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(''), 15000);
+
+            ipc.config.retry = 1500;
+            configureIpc();
+
+            ipc.connectTo('bot', () => {
+                ipc.of.bot.emit('list:categories', { guildIds: selectedGuildIds, token: credentials.token });
+
+                ipc.of.bot.on('list:categories', (data: { name: string; value: string }[]) => {
+                    clearTimeout(timeout);
+                    resolve(data);
+                });
+            });
+        });
+
+    const categories = await categoriesRequest().catch((e) => e);
+
+    let message = 'Unexpected error';
+
+    if (categories) {
+        if (Array.isArray(categories) && categories.length) return categories;
+        else
+            message =
+                'Your Discord server has no categories, please add at least one category' +
+                endMessage;
+    }
+
+    return [
+        {
+            name: message,
+            value: 'false',
+        },
+    ];
+};
+
 export const getRoles = async (that: any, selectedGuildIds: string[]): Promise<INodePropertyOptions[]> => {
     const endMessage = ' - Close and reopen this node modal once you have made changes.';
 
@@ -229,6 +280,45 @@ export const checkWorkflowStatus = async (n8nApiUrl: String, apiToken: String, w
     });
 }
 
+
+// Support ticket: Toggle channel enable/disable
+export const toggleChannelStatus = (channelId: string, action: 'close' | 'open'): Promise<any> => {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject('timeout'), 15000);
+
+        ipc.config.retry = 1500;
+        configureIpc();
+
+        ipc.connectTo('bot', () => {
+            ipc.of.bot.emit('support:toggle-channel', { channelId, action });
+
+            ipc.of.bot.on('callback:support:toggle-channel', (data: any) => {
+                clearTimeout(timeout);
+                resolve(data);
+            });
+        });
+    });
+};
+
+// Support ticket: Check channel status
+export const checkChannelStatus = (channelId: string): Promise<{ isDisabled: boolean; isEnabled: boolean }> => {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject('timeout'), 15000);
+
+        ipc.config.retry = 1500;
+        configureIpc();
+
+        ipc.connectTo('bot', () => {
+            ipc.of.bot.emit('support:check-channel-status', { channelId });
+
+            ipc.of.bot.on('callback:support:check-channel-status', (data: any) => {
+                clearTimeout(timeout);
+                if (data.error) reject('error');
+                else resolve(data);
+            });
+        });
+    });
+};
 
 
 export const ipcRequest = (type: string, parameters: any): Promise<any> => {

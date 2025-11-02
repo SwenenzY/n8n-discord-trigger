@@ -26,17 +26,22 @@ export const options: INodeProperties[] = [
         default: 'message',
         description: 'Let you choose the type of interaction you want to perform',
     },
-   {
+    {
         displayName: 'Action',
         name: 'actionType',
 
         displayOptions: {
             show: {
-                type: ['action'],
+                type: [ 'action' ],
             },
         },
         type: 'options',
         options: [
+            {
+                name: 'Get Messages',
+                value: 'getMessages',
+                description: 'Get messages from a channel',
+            },
             {
                 name: 'Remove Messages',
                 value: 'removeMessages',
@@ -63,7 +68,7 @@ export const options: INodeProperties[] = [
         type: 'options',
         displayOptions: {
             show: {
-                type: ['action', 'message', 'confirm'],
+                type: [ 'action', 'message', 'confirm' ],
             },
         },
         typeOptions: {
@@ -71,7 +76,7 @@ export const options: INodeProperties[] = [
         },
         default: '',
         description: 'Let you specify the guild where you want the action to happen. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
-    }, 
+    },
     {
         displayName: 'Channel Name or ID',
         name: 'channelId',
@@ -79,15 +84,33 @@ export const options: INodeProperties[] = [
         type: 'options',
         displayOptions: {
             show: {
-                type: ['message', 'action', 'confirm'],
+                type: [ 'message', 'action', 'confirm' ],
             },
         },
         typeOptions: {
-            loadOptionsDependsOn: ['guildIds'],
+            loadOptionsDependsOn: [ 'guildIds' ],
             loadOptionsMethod: 'getChannels',
         },
         default: '',
         description: 'Let you specify the text channels where you want to send the message. Your credentials must be set and the bot running, you also need at least one text channel available. If you do not meet these requirements, make the changes then close and reopen the modal (the channels list is loaded when the modal opens). Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+    },
+    {
+        displayName: 'Message Limit',
+        name: 'getMessagesLimit',
+        type: 'number',
+        required: true,
+        displayOptions: {
+            show: {
+                type: [ 'action' ],
+                actionType: [ 'getMessages' ],
+            },
+        },
+        typeOptions: {
+            maxValue: 100,
+            minValue: 1,
+        },
+        default: 10,
+        description: 'Number of messages to fetch (max 100)',
     },
     {
         displayName: 'How Many?',
@@ -96,8 +119,8 @@ export const options: INodeProperties[] = [
         required: true,
         displayOptions: {
             show: {
-                type: ['action'],
-                actionType: ['removeMessages'],
+                type: [ 'action' ],
+                actionType: [ 'removeMessages' ],
             },
         },
         typeOptions: {
@@ -113,8 +136,8 @@ export const options: INodeProperties[] = [
         required: true,
         displayOptions: {
             show: {
-                type: ['action'],
-                actionType: ['addRole', 'removeRole'],
+                type: [ 'action' ],
+                actionType: [ 'addRole', 'removeRole' ],
             },
         },
         default: '',
@@ -127,12 +150,12 @@ export const options: INodeProperties[] = [
         type: 'multiOptions',
         displayOptions: {
             show: {
-                type: ['action'],
-                actionType: ['addRole', 'removeRole'],
+                type: [ 'action' ],
+                actionType: [ 'addRole', 'removeRole' ],
             },
         },
         typeOptions: {
-            loadOptionsDependsOn: ['guildIds'],
+            loadOptionsDependsOn: [ 'guildIds' ],
             loadOptionsMethod: 'getRoles',
         },
         default: [],
@@ -144,7 +167,7 @@ export const options: INodeProperties[] = [
         type: 'string',
         displayOptions: {
             show: {
-                type: ['message', 'confirm'],
+                type: [ 'message', 'confirm' ],
             },
         },
         typeOptions: {
@@ -159,7 +182,7 @@ export const options: INodeProperties[] = [
         type: 'boolean',
         displayOptions: {
             show: {
-                type: ['message', 'confirm'],
+                type: [ 'message', 'confirm' ],
             },
         },
 
@@ -173,8 +196,8 @@ export const options: INodeProperties[] = [
         default: '', // Initially selected color
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
     },
@@ -185,8 +208,8 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
         default: '',
@@ -199,8 +222,8 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
         default: '',
@@ -213,8 +236,8 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
         default: '',
@@ -227,11 +250,11 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
             hide: {
-                authorName: [''],
+                authorName: [ '' ],
             },
         },
         default: '',
@@ -244,11 +267,11 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
             hide: {
-                authorName: [''],
+                authorName: [ '' ],
             },
         },
         default: '',
@@ -261,8 +284,8 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
         default: '',
@@ -275,8 +298,8 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
         default: '',
@@ -292,8 +315,8 @@ export const options: INodeProperties[] = [
         },
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'action', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'action', 'confirm' ],
             },
         },
 
@@ -335,8 +358,8 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
         default: '',
@@ -349,8 +372,8 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
         default: '',
@@ -363,11 +386,11 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
             hide: {
-                footerText: [''],
+                footerText: [ '' ],
             },
         },
         default: '',
@@ -381,8 +404,8 @@ export const options: INodeProperties[] = [
 
         displayOptions: {
             show: {
-                embed: [true],
-                type: ['message', 'confirm'],
+                embed: [ true ],
+                type: [ 'message', 'confirm' ],
             },
         },
     },
@@ -396,7 +419,7 @@ export const options: INodeProperties[] = [
         },
         displayOptions: {
             show: {
-                type: ['message', 'confirm'],
+                type: [ 'message', 'confirm' ],
             },
         },
         description: 'Allows to attach up to 5 images to the message',
@@ -427,45 +450,45 @@ export const options: INodeProperties[] = [
         },
         displayOptions: {
             show: {
-                type: ['message', 'confirm'],
+                type: [ 'message', 'confirm' ],
             },
         },
         default: [],
         description: 'Let you specify roles you want to mention in the message. Your credentials must be set and the bot running, you also need at least one role (apart from @everyone) available. If you do not meet these requirements, make the changes then close and reopen the modal. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
     },
     {
-    displayName: 'Additional Fields',
-    name: 'additionalConfirmationFields',
-    type: 'collection',
-    default: {},
-    placeholder: 'Add Field',
-    displayOptions: {
+        displayName: 'Additional Fields',
+        name: 'additionalConfirmationFields',
+        type: 'collection',
+        default: {},
+        placeholder: 'Add Field',
+        displayOptions: {
             show: {
-                type: ['confirm'],
+                type: [ 'confirm' ],
             },
         },
-    options: [
-      {
-        displayName: 'Confirmation Timeout (in Seconds)',
-        name: 'timeout',
-        type: 'number',
-        default: 60,
-        description: "Timeout for the confirmation message. If the user does not respond within this time, the interaction will be considered as expired.",
-      },
-      {
-        displayName: 'Yes Button Label',
-        name: 'yesLabel',
-        type: 'string',
-        default: '',
-        description: 'Optional custom label for the "Yes" button',
-      },
-      {
-        displayName: 'No Button Label',
-        name: 'noLabel',
-        type: 'string',
-        default: '',
-        description: 'Optional custom label for the "No" button',
-       },
-    ],									
-  }
+        options: [
+            {
+                displayName: 'Confirmation Timeout (in Seconds)',
+                name: 'timeout',
+                type: 'number',
+                default: 60,
+                description: "Timeout for the confirmation message. If the user does not respond within this time, the interaction will be considered as expired.",
+            },
+            {
+                displayName: 'Yes Button Label',
+                name: 'yesLabel',
+                type: 'string',
+                default: '',
+                description: 'Optional custom label for the "Yes" button',
+            },
+            {
+                displayName: 'No Button Label',
+                name: 'noLabel',
+                type: 'string',
+                default: '',
+                description: 'Optional custom label for the "No" button',
+            },
+        ],
+    }
 ];

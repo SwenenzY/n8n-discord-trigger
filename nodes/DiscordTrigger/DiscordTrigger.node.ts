@@ -16,6 +16,7 @@ import {
     getChannels as getChannelsHelper,
     getRoles as getRolesHelper,
     getGuilds as getGuildsHelper,
+    getCategories as getCategoriesHelper,
 } from '../helper';
 import settings from '../settings';
 
@@ -88,6 +89,16 @@ export class DiscordTrigger implements INodeType {
 
 
                 return await getRolesHelper(this, selectedGuilds).catch((e) => e) as { name: string; value: string }[];
+            },
+            async getCategories(): Promise<INodePropertyOptions[]> {
+                // @ts-ignore
+                const selectedGuilds = this.getNodeParameter('guildIds', []);
+                if (!selectedGuilds.length) {
+                    // @ts-ignore
+                    throw new NodeOperationError('Please select at least one server before choosing categories.');
+                }
+
+                return await getCategoriesHelper(this, selectedGuilds).catch((e) => e) as { name: string; value: string }[];
             },
         },
     };

@@ -57,6 +57,11 @@ export const options: INodeProperties[] = [
 				value: 'user-update',
 				description: 'When a user is updated on the server (i.e. new role, removed role, nickname).',
 			},
+      {
+				name: 'Support Command',
+				value: 'support-command',
+				description: 'When /support-close or /support-open commands are used. Use this to manage support ticket channels with role-based permissions.',
+			},
     ],
     default: 'message',
     description: 'Type of event to listen to. User events must specify a channel to listen to if you want to use a placeholder or the option "send to the trigger channel" in a Discord Send node.',
@@ -76,6 +81,23 @@ export const options: INodeProperties[] = [
     },
     default: [],
     description: 'Lets you specify whether you want to listen one or more specific discord servers. Choose from the list, or specify an ID. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+  },
+  {
+    displayName: 'Listen To Categories',
+    name: 'categoryIds',
+    placeholder: 'e.g. my-category',
+    type: 'multiOptions',
+    typeOptions: {
+      loadOptionsDependsOn: ['guildIds'],
+      loadOptionsMethod: 'getCategories',
+    },
+    displayOptions: {
+      show: {
+        type: ['message', 'message-reaction-add', 'message-reaction-remove'],
+      },
+    },
+    default: [],
+    description: 'Lets you select categories to filter channels. Only channels in selected categories will be monitored. If none selected, all channels will be monitored. Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
   },
   {
     displayName: 'Listen To Channels',

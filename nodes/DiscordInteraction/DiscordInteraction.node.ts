@@ -253,7 +253,7 @@ export class DiscordInteraction implements INodeType {
 
                 if (nodeParameters.channelId || nodeParameters.executionId) {
                     // return the interaction result if there is one
-                    const res: any = new Promise((resolve) => {
+                    const res: any = await new Promise((resolve) => {
                         ipc.config.retry = 1500;
                         configureIpc();
                         ipc.connectTo('bot', () => {

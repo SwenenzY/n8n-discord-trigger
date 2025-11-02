@@ -738,6 +738,22 @@ export default function () {
                 return;
             }
 
+            // Cleanup existing client if any (prevents duplicate listeners on restart)
+            if ( settings.clientMap[ token ] ) {
+                console.log( `Destroying old client for token before creating new one` );
+                try {
+                    // Remove all event listeners before destroying
+                    settings.clientMap[ token ].removeAllListeners();
+                    settings.clientMap[ token ].destroy();
+                } catch ( e ) {
+                    console.error( `Error destroying old client:`, e );
+                }
+                delete settings.clientMap[ token ];
+                delete settings.readyClients[ token ];
+                delete settings.triggerNodes[ token ];
+                settings.loginQueue[ token ] = false;
+            }
+
             settings.loginQueue[ token ] = true;
             try {
                 const client = spawnClient( token, clientId );
@@ -1054,6 +1070,49 @@ export default function () {
     } );
 
     ipc.server.start();
+
+    // Cleanup function to destroy all clients and timers
+    const cleanup = () => {
+        console.log( 'Cleaning up Discord clients and timers...' );
+
+        // Clear all debounce/cooldown timers
+        for ( const timer of settings.userMessageTimers.values() ) {
+            clearTimeout( timer );
+        }
+        settings.userMessageTimers.clear();
+        settings.userLastMessages.clear();
+        settings.lastEmitTime.clear();
+
+        // Destroy all Discord clients
+        for ( const token in settings.clientMap ) {
+            try {
+                console.log( `Destroying client for token ${token}` );
+                settings.clientMap[ token ].removeAllListeners();
+                settings.clientMap[ token ].destroy();
+            } catch ( e ) {
+                console.error( `Error destroying client:`, e );
+            }
+        }
+        settings.clientMap = {};
+        settings.readyClients = {};
+        settings.triggerNodes = {};
+    };
+
+    // Register cleanup handlers for process termination
+    process.on( 'exit', cleanup );
+    process.on( 'SIGINT', () => {
+        cleanup();
+        process.exit( 0 );
+    } );
+    process.on( 'SIGTERM', () => {
+        cleanup();
+        process.exit( 0 );
+    } );
+    process.on( 'uncaughtException', ( err ) => {
+        console.error( 'Uncaught exception:', err );
+        cleanup();
+        process.exit( 1 );
+    } );
 }
 
 function prepareMessage ( nodeParameters: any ): any {

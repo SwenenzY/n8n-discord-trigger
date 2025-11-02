@@ -31,8 +31,15 @@ function configureIpc() {
     }
 }
 
-// we start the bot if we are in the main process
-if (!process.send) bot();
+// we start the bot if we are in the main process or if we're running on a Unix system
+// Use a global flag to ensure we only start the bot once
+if (!(global as any).__discordBotStarted) {
+    if (!process.send || process.platform !== 'win32') {
+        console.log('Starting Discord bot IPC server...');
+        bot();
+        (global as any).__discordBotStarted = true;
+    }
+}
 
 export class DiscordTrigger implements INodeType {
     description: INodeTypeDescription = {

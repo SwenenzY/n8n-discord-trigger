@@ -484,8 +484,8 @@ export default function () {
                         messageCreateOptions.attachments = message.attachments;
 
                         // Get debounce and cooldown settings from additionalFields
-                        const debounceSeconds = parameters.debounceSeconds || 0;
-                        const cooldownSeconds = parameters.cooldownSeconds || 0;
+                        const debounceSeconds = parameters.additionalFields?.debounceSeconds || 0;
+                        const cooldownSeconds = parameters.additionalFields?.cooldownSeconds || 0;
                         const debounceKey = `${message.channel.id}:${message.author.id}:${nodeId}`;
 
                         // Helper: Check if cooldown allows emission

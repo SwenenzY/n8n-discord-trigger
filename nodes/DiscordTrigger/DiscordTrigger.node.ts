@@ -26,7 +26,7 @@ export class DiscordTrigger implements INodeType {
     description: INodeTypeDescription = {
         displayName: 'Discord Trigger',
         name: 'discordTrigger',
-        group: ['trigger', 'discord'],
+        group: ['trigger'],
         version: 1,
         description: 'Discord Trigger on message',
         defaults: {

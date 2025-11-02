@@ -89,7 +89,7 @@ export class DiscordInteraction implements INodeType {
     description: INodeTypeDescription = {
         displayName: 'Discord Interaction',
         name: 'discordInteraction',
-        group: ['discord'],
+        group: ['input'],
         version: 1,
         description: 'Sends messages, embeds and prompts to Discord',
         defaults: {

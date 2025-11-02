@@ -43,6 +43,16 @@ export const options: INodeProperties[] = [
                 description: 'Get messages from a channel',
             },
             {
+                name: 'Check Channel Status',
+                value: 'checkChannelStatus',
+                description: 'Check if a channel is disabled for triggers (support ticket system)',
+            },
+            {
+                name: 'Toggle Channel Status',
+                value: 'toggleChannelStatus',
+                description: 'Enable or disable triggers for a channel (support ticket system)',
+            },
+            {
                 name: 'Remove Messages',
                 value: 'removeMessages',
                 description: 'Remove last messages from the "send to" channel',
@@ -111,6 +121,32 @@ export const options: INodeProperties[] = [
         },
         default: 10,
         description: 'Number of messages to fetch (max 100)',
+    },
+    {
+        displayName: 'Toggle Action',
+        name: 'toggleAction',
+        type: 'options',
+        required: true,
+        displayOptions: {
+            show: {
+                type: [ 'action' ],
+                actionType: [ 'toggleChannelStatus' ],
+            },
+        },
+        options: [
+            {
+                name: 'Close (Disable Triggers)',
+                value: 'close',
+                description: 'Disable all triggers for this channel',
+            },
+            {
+                name: 'Open (Enable Triggers)',
+                value: 'open',
+                description: 'Enable all triggers for this channel',
+            },
+        ],
+        default: 'close',
+        description: 'Choose whether to enable or disable triggers for the channel',
     },
     {
         displayName: 'How Many?',

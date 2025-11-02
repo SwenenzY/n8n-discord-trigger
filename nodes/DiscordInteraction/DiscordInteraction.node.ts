@@ -16,6 +16,8 @@ import {
     getChannels as getChannelsHelper,
     getRoles as getRolesHelper,
     getGuilds as getGuildsHelper,
+    toggleChannelStatus,
+    checkChannelStatus,
 } from '../helper';
 
 // Configure IPC for cross-platform compatibility
@@ -221,6 +223,33 @@ export class DiscordInteraction implements INodeType {
                     nodeParameters[key] = this.getNodeParameter(key, itemIndex, '') as any;
                 });
                 nodeParameters.executionId = executionId;
+
+                // Handle support ticket actions directly with helper functions
+                if (nodeParameters.type === 'action' && nodeParameters.actionType === 'checkChannelStatus') {
+                    const status = await checkChannelStatus(nodeParameters.channelId);
+                    returnData.push({
+                        json: {
+                            channelId: nodeParameters.channelId,
+                            isDisabled: status.isDisabled,
+                            isEnabled: status.isEnabled,
+                            action: 'checkChannelStatus',
+                        },
+                    });
+                    continue;
+                }
+
+                if (nodeParameters.type === 'action' && nodeParameters.actionType === 'toggleChannelStatus') {
+                    const action = nodeParameters.toggleAction || 'close';
+                    const result = await toggleChannelStatus(nodeParameters.channelId, action);
+                    returnData.push({
+                        json: {
+                            success: result.success,
+                            channelId: nodeParameters.channelId,
+                            action: result.action,
+                        },
+                    });
+                    continue;
+                }
 
                 if (nodeParameters.channelId || nodeParameters.executionId) {
                     // return the interaction result if there is one

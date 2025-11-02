@@ -255,25 +255,48 @@ export class DiscordInteraction implements INodeType {
                     // return the interaction result if there is one
                     const res: any = await new Promise((resolve, reject) => {
                         const timeout = setTimeout(() => {
+                            console.log('IPC timeout after 30 seconds');
+                            ipc.disconnect('bot');
                             reject(new Error('IPC timeout after 30 seconds'));
                         }, 30000);
 
                         ipc.config.retry = 1500;
+                        ipc.config.maxRetries = 3;
                         configureIpc();
+
+                        const type = `send:${nodeParameters.type}`;
+                        let callbackReceived = false;
+
                         ipc.connectTo('bot', () => {
-                            const type = `send:${nodeParameters.type}`;
+                            // Setup callback listener first
                             ipc.of.bot.on(`callback:${type}`, (data: any) => {
-                                clearTimeout(timeout);
-                                console.log('Received callback:', type, data);
-                                resolve(data);
+                                if (!callbackReceived) {
+                                    callbackReceived = true;
+                                    clearTimeout(timeout);
+                                    console.log('Received callback:', type, data);
+                                    ipc.disconnect('bot');
+                                    resolve(data);
+                                }
                             });
 
-                            // send event to bot
-                            console.log('Emitting event:', type, nodeParameters);
-                            ipc.of.bot.emit(type, {token: credentials.token, nodeParameters:nodeParameters});
+                            // Wait for connection to be established
+                            ipc.of.bot.on('connect', () => {
+                                console.log('Connected to bot IPC, emitting event:', type, nodeParameters);
+                                // Now send the event
+                                ipc.of.bot.emit(type, {token: credentials.token, nodeParameters:nodeParameters});
+                            });
+
+                            ipc.of.bot.on('disconnect', () => {
+                                if (!callbackReceived) {
+                                    clearTimeout(timeout);
+                                    console.log('Disconnected from IPC before receiving callback');
+                                    reject(new Error('Disconnected from IPC'));
+                                }
+                            });
                         });
                     }).catch((e) => {
                         console.log('IPC Error:', e);
+                        ipc.disconnect('bot');
                         return null;
                     });
 

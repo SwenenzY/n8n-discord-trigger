@@ -19,6 +19,18 @@ import {
 } from '../helper';
 import settings from '../settings';
 
+// Configure IPC for cross-platform compatibility
+function configureIpc() {
+    if (process.platform === 'win32') {
+        ipc.config.socketRoot = '\\\\.\\pipe\\';
+        ipc.config.appspace = '';
+    } else {
+        // Unix-like systems (Linux, macOS)
+        ipc.config.socketRoot = '/tmp/';
+        ipc.config.appspace = 'app.';
+    }
+}
+
 // we start the bot if we are in the main process
 if (!process.send) bot();
 
@@ -85,6 +97,7 @@ export class DiscordTrigger implements INodeType {
 
         await connection(credentials).catch((e) => e);
 
+        configureIpc();
         ipc.connectTo('bot', () => {
             console.log('Connected to IPC server');
 
@@ -240,6 +253,7 @@ export class DiscordTrigger implements INodeType {
                 delete settings.triggerNodes[this.getNode().id];
 
                 // Send message to bot process to deregister this node
+                configureIpc();
                 ipc.connectTo('bot', () => {
                     ipc.of.bot.emit('triggerNodeRemoved', { nodeId: this.getNode().id });
                 });

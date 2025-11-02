@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-discord-trigger-new",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "A node that triggers a workflow whenever a message from discord is sent.",
   "keywords": [
     "n8n",
@@ -29,6 +29,7 @@
   "scripts": {
     "build": "tsc && gulp build:icons",
     "dev": "tsc --watch",
+    "update": "npm publish --access=public --ignore-scripts",
     "format": "prettier nodes credentials --write",
     "lint": "eslint nodes credentials package.json",
     "lintfix": "eslint nodes credentials package.json --fix",

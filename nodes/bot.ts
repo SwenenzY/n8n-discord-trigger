@@ -23,6 +23,16 @@ export default function () {
     ipc.config.retry = 1500;
     ipc.config.silent = true;
 
+    // Configure socket path based on platform
+    if (process.platform === 'win32') {
+        ipc.config.socketRoot = '\\\\.\\pipe\\';
+        ipc.config.appspace = '';
+    } else {
+        // Unix-like systems (Linux, macOS)
+        ipc.config.socketRoot = '/tmp/';
+        ipc.config.appspace = 'app.';
+    }
+
     function spawnClient(token: string, clientId: string) : Client {
 
         const client = new Client({

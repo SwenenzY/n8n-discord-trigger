@@ -9,6 +9,18 @@ export interface ICredentials {
     baseUrl: string;
 }
 
+// Configure IPC for cross-platform compatibility
+function configureIpc() {
+    if (process.platform === 'win32') {
+        ipc.config.socketRoot = '\\\\.\\pipe\\';
+        ipc.config.appspace = '';
+    } else {
+        // Unix-like systems (Linux, macOS)
+        ipc.config.socketRoot = '/tmp/';
+        ipc.config.appspace = 'app.';
+    }
+}
+
 export const connection = (credentials: ICredentials): Promise<string> => {
     return new Promise((resolve, reject) => {
         if (!credentials || !credentials.token || !credentials.clientId) {
@@ -19,6 +31,8 @@ export const connection = (credentials: ICredentials): Promise<string> => {
         const timeout = setTimeout(() => reject('timeout'), 15000);
 
         ipc.config.retry = 1500;
+        configureIpc();
+
         ipc.connectTo('bot', () => {
             ipc.of.bot.emit('credentials', credentials);
 
@@ -54,6 +68,8 @@ export const getChannels = async (that: any, guildIds: string[]): Promise<INodeP
             const timeout = setTimeout(() => resolve(''), 15000);
 
             ipc.config.retry = 1500;
+            configureIpc();
+
             ipc.connectTo('bot', () => {
                 ipc.of.bot.emit('list:channels', {guildIds: guildIds, token: credentials.token});
 
@@ -104,6 +120,8 @@ export const getGuilds = async (that: any): Promise<INodePropertyOptions[]> => {
             const timeout = setTimeout(() => resolve(''), 15000);
 
             ipc.config.retry = 1500;
+            configureIpc();
+
             ipc.connectTo('bot', () => {
                 ipc.of.bot.emit('list:guilds', { token: credentials.token });
 
@@ -158,6 +176,8 @@ export const getRoles = async (that: any, selectedGuildIds: string[]): Promise<I
             const timeout = setTimeout(() => resolve(''), 15000);
 
             ipc.config.retry = 1500;
+            configureIpc();
+
             ipc.connectTo('bot', () => {
                 ipc.of.bot.emit('list:roles', { guildIds: selectedGuildIds, token: credentials.token });
 
@@ -214,6 +234,8 @@ export const checkWorkflowStatus = async (n8nApiUrl: String, apiToken: String, w
 export const ipcRequest = (type: string, parameters: any): Promise<any> => {
     return new Promise((resolve) => {
         ipc.config.retry = 1500;
+        configureIpc();
+
         ipc.connectTo('bot', () => {
             ipc.of.bot.on(`callback:${type}`, (data: any) => {
                 console.log("response fired", data);

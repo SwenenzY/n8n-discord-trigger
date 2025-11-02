@@ -12,7 +12,6 @@ import ipc from 'node-ipc';
 import {
     connection,
     ICredentials,
-    checkWorkflowStatus,
     getChannels as getChannelsHelper,
     getRoles as getRolesHelper,
     getGuilds as getGuildsHelper,
@@ -263,9 +262,6 @@ export class DiscordTrigger implements INodeType {
         // Return the cleanup function
         return {
             closeFunction: async () => {
-                const credentials = (await this.getCredentials('discordBotTriggerApi').catch((e) => e)) as any as ICredentials;
-                const isActive = await checkWorkflowStatus(credentials.baseUrl, credentials.apiKey, String(this.getWorkflow().id));
-
                 // remove the node from being executed
                 console.log("removing trigger node");
 
@@ -277,11 +273,11 @@ export class DiscordTrigger implements INodeType {
                     ipc.of.bot.emit('triggerNodeRemoved', { nodeId: this.getNode().id });
                 });
 
-                // disable the node if the workflow is not activated, but keep it running if it was just the test node
-                if (!isActive || this.getActivationMode() !== 'manual') {
-                    console.log('Workflow stopped. Disconnecting bot...');
-                    ipc.disconnect('bot');
-                }
+                // Note: We do NOT disconnect from IPC here because:
+                // 1. Other action nodes might still need the bot IPC server
+                // 2. The bot process should keep running for action nodes
+                // 3. IPC disconnect would break any in-flight action requests
+                console.log('Trigger node removed, keeping bot IPC server running for action nodes');
             },
         };
     }

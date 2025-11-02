@@ -272,6 +272,22 @@ export const options: INodeProperties[] = [
         default: false,
         description: "Whether this node needs to have at least one attachment to be triggered",
       },
+      {
+        displayName: 'Message Debounce (seconds)',
+        name: 'debounceSeconds',
+        type: 'number',
+        default: 0,
+        description: 'Wait X seconds after last message from same user in same channel before triggering. Sends only the last message. Useful to prevent spam when users type multiple messages quickly. Set to 0 to disable (trigger on every message).',
+        placeholder: '30',
+      },
+      {
+        displayName: 'Execution Cooldown (seconds)',
+        name: 'cooldownSeconds',
+        type: 'number',
+        default: 0,
+        description: 'After triggering workflow, wait X seconds before allowing same user in same channel to trigger again. Prevents multiple parallel executions. Messages during cooldown are queued and sent after cooldown expires. Set to 0 to disable.',
+        placeholder: '60',
+      },
     ],
   },
 ];

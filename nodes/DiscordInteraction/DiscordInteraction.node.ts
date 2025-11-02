@@ -18,6 +18,7 @@ import {
     getGuilds as getGuildsHelper,
     toggleChannelStatus,
     checkChannelStatus,
+    getMessages as getMessagesHelper,
 } from '../helper';
 
 // Configure IPC for cross-platform compatibility
@@ -248,6 +249,23 @@ export class DiscordInteraction implements INodeType {
                             action: result.action,
                         },
                     });
+                    continue;
+                }
+
+                // Handle getMessages action with helper function
+                if (nodeParameters.type === 'action' && nodeParameters.actionType === 'getMessages') {
+                    const limit = nodeParameters.getMessagesLimit || 10;
+                    const result = await getMessagesHelper(credentials.token, nodeParameters.channelId, limit);
+
+                    // Handle response
+                    if (result?.action === 'getMessages' && result?.messages) {
+                        // Return each message as a separate item
+                        result.messages.forEach((message: any) => {
+                            returnData.push({ json: message });
+                        });
+                    } else {
+                        returnData.push({ json: result || {} });
+                    }
                     continue;
                 }
 

@@ -46,6 +46,11 @@ const settings: {
 
     // Support ticket channel management
     disabledChannels: Set<string>;
+
+    // Message debounce tracking (prevents spam from same user in same channel)
+    userMessageTimers: Map<string, NodeJS.Timeout>; // key: "channelId:userId:nodeId" -> timer
+    userLastMessages: Map<string, any>; // key: "channelId:userId:nodeId" -> last message data
+    lastEmitTime: Map<string, number>; // key: "channelId:userId:nodeId" -> timestamp of last emit (for cooldown)
 } = {
     ready: false,
     login: false,
@@ -63,6 +68,9 @@ const settings: {
     credentials: {},
 
     disabledChannels: loadDisabledChannels(),
+    userMessageTimers: new Map(),
+    userLastMessages: new Map(),
+    lastEmitTime: new Map(),
 }
 
 export default settings;

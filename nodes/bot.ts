@@ -63,7 +63,7 @@ export default function () {
                     if ( 'user-join' !== parameters.type )
                         continue;
 
-                    if ( parameters.guildIds.length && !parameters.guildIds.includes( guildMember.guild.id ) )
+                    if ( parameters.guildIds && parameters.guildIds.length && !parameters.guildIds.includes( guildMember.guild.id ) )
                         continue;
 
                     ipc.server.emit( parameters.socket, 'guildMemberAdd', {
@@ -86,7 +86,7 @@ export default function () {
                     if ( 'user-leave' !== parameters.type )
                         continue;
 
-                    if ( parameters.guildIds.length && !parameters.guildIds.includes( guildMember.guild.id ) )
+                    if ( parameters.guildIds && parameters.guildIds.length && !parameters.guildIds.includes( guildMember.guild.id ) )
                         continue;
 
                     ipc.server.emit( parameters.socket, 'guildMemberRemove', {
@@ -109,7 +109,7 @@ export default function () {
                     if ( 'user-update' !== parameters.type )
                         continue;
 
-                    if ( parameters.guildIds.length && !parameters.guildIds.includes( oldMember.guild.id ) )
+                    if ( parameters.guildIds && parameters.guildIds.length && !parameters.guildIds.includes( oldMember.guild.id ) )
                         continue;
 
                     ipc.server.emit( parameters.socket, 'guildMemberUpdate', {
@@ -151,7 +151,7 @@ export default function () {
                     }
                     else if ( user.id === message.client.user.id ) continue;
 
-                    if ( parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
+                    if ( parameters.guildIds && parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
                         continue;
 
                     if ( parameters.messageIds.length && !parameters.messageIds.includes( message.id ) )
@@ -165,14 +165,14 @@ export default function () {
                     }
 
                     // check if executed by the proper channel
-                    if ( parameters.channelIds.length ) {
+                    if ( parameters.channelIds && parameters.channelIds.length ) {
                         const isInChannel = parameters.channelIds.some( ( channelId: any ) => message.channel.id?.includes( channelId ) );
                         if ( !isInChannel ) continue;
                     }
 
                     // check if executed by the proper role
                     const userRoles = message.member?.roles.cache.map( ( role: any ) => role.id );
-                    if ( parameters.roleIds.length ) {
+                    if ( parameters.roleIds && parameters.roleIds.length ) {
                         const hasRole = parameters.roleIds.some( ( role: any ) => userRoles?.includes( role ) );
                         if ( !hasRole ) continue;
                     }
@@ -216,7 +216,7 @@ export default function () {
                     }
                     else if ( user.id === message.client.user.id ) continue;
 
-                    if ( parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
+                    if ( parameters.guildIds && parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
                         continue;
 
                     if ( parameters.messageIds.length && !parameters.messageIds.includes( message.id ) )
@@ -230,14 +230,14 @@ export default function () {
                     }
 
                     // check if executed by the proper channel
-                    if ( parameters.channelIds.length ) {
+                    if ( parameters.channelIds && parameters.channelIds.length ) {
                         const isInChannel = parameters.channelIds.some( ( channelId: any ) => message.channel.id?.includes( channelId ) );
                         if ( !isInChannel ) continue;
                     }
 
                     // check if executed by the proper role
                     const userRoles = message.member?.roles.cache.map( ( role: any ) => role.id );
-                    if ( parameters.roleIds.length ) {
+                    if ( parameters.roleIds && parameters.roleIds.length ) {
                         const hasRole = parameters.roleIds.some( ( role: any ) => userRoles?.includes( role ) );
                         if ( !hasRole ) continue;
                     }
@@ -262,7 +262,7 @@ export default function () {
                     if ( 'role-create' !== parameters.type )
                         continue;
 
-                    if ( parameters.guildIds.length && !parameters.guildIds.includes( role.guild.id ) )
+                    if ( parameters.guildIds && parameters.guildIds.length && !parameters.guildIds.includes( role.guild.id ) )
                         continue;
 
                     ipc.server.emit( parameters.socket, 'roleCreate', {
@@ -284,7 +284,7 @@ export default function () {
                     if ( 'role-delete' !== parameters.type )
                         continue;
 
-                    if ( parameters.guildIds.length && !parameters.guildIds.includes( role.guild.id ) )
+                    if ( parameters.guildIds && parameters.guildIds.length && !parameters.guildIds.includes( role.guild.id ) )
                         continue;
 
                     ipc.server.emit( parameters.socket, 'roleDelete', {
@@ -318,7 +318,7 @@ export default function () {
                     if ( 'role-update' !== parameters.type )
                         continue;
 
-                    if ( parameters.guildIds.length && !parameters.guildIds.includes( oldRole.guild.id ) )
+                    if ( parameters.guildIds && parameters.guildIds.length && !parameters.guildIds.includes( oldRole.guild.id ) )
                         continue;
 
                     ipc.server.emit( parameters.socket, 'roleUpdate', {
@@ -347,7 +347,7 @@ export default function () {
                         if ( parameters.type !== 'support-command' ) continue;
 
                         // Check guild filter
-                        if ( parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
+                        if ( parameters.guildIds && parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
                             continue;
 
                         // Emit to n8n for role check and response
@@ -402,12 +402,12 @@ export default function () {
                     else if ( message.author.id === message.client.user.id ) continue;
 
                     // For guild messages, check guild ID filter (skip for direct messages)
-                    if ( !isDirectMessage && parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
+                    if ( !isDirectMessage && parameters.guildIds && parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
                         continue;
 
                     // check if executed by the proper role (skip for direct messages)
                     const userRoles = !isDirectMessage ? message.member?.roles.cache.map( ( role: any ) => role.id ) : [];
-                    if ( !isDirectMessage && parameters.roleIds.length ) {
+                    if ( !isDirectMessage && parameters.roleIds && parameters.roleIds.length ) {
                         const hasRole = parameters.roleIds.some( ( role: any ) => userRoles?.includes( role ) );
                         if ( !hasRole ) continue;
                     }
@@ -420,7 +420,7 @@ export default function () {
                     }
 
                     // check if executed by the proper channel (skip for direct messages)
-                    if ( !isDirectMessage && parameters.channelIds.length ) {
+                    if ( !isDirectMessage && parameters.channelIds && parameters.channelIds.length ) {
                         const isInChannel = parameters.channelIds.some( ( channelId: any ) => message.channel.id?.includes( channelId ) );
                         if ( !isInChannel ) continue;
                     }
@@ -465,8 +465,6 @@ export default function () {
                     const reg = new RegExp( regStr, parameters.caseSensitive ? '' : 'i' );
 
                     if ( ( pattern === "botMention" && botMention ) || reg.test( message.content ) ) {
-                        // Emit the message data to n8n
-
                         // message create Options
                         const messageCreateOptions: any = {
                             message,
@@ -485,9 +483,101 @@ export default function () {
                         if ( onlyWithAttachments && !message.attachments ) continue;
                         messageCreateOptions.attachments = message.attachments;
 
-                        console.log( "about to emit messageCreate", message.id );
+                        // Get debounce and cooldown settings from additionalFields
+                        const debounceSeconds = parameters.debounceSeconds || 0;
+                        const cooldownSeconds = parameters.cooldownSeconds || 0;
+                        const debounceKey = `${message.channel.id}:${message.author.id}:${nodeId}`;
 
-                        ipc.server.emit( parameters.socket, 'messageCreate', messageCreateOptions );
+                        // Helper: Check if cooldown allows emission
+                        const canEmit = ( key: string ): { canEmit: boolean; remainingSeconds: number } => {
+                            if ( cooldownSeconds === 0 ) return { canEmit: true, remainingSeconds: 0 };
+
+                            const lastEmit = settings.lastEmitTime.get( key );
+                            if ( !lastEmit ) return { canEmit: true, remainingSeconds: 0 };
+
+                            const elapsedSeconds = ( Date.now() - lastEmit ) / 1000;
+                            const remainingSeconds = Math.max( 0, cooldownSeconds - elapsedSeconds );
+
+                            return {
+                                canEmit: remainingSeconds === 0,
+                                remainingSeconds: Math.ceil( remainingSeconds ),
+                            };
+                        };
+
+                        // Helper: Emit with cooldown tracking
+                        const emitMessage = ( socket: any, data: any ) => {
+                            console.log( `Emitting message from ${message.author.username}` );
+                            ipc.server.emit( socket, 'messageCreate', data );
+                            settings.lastEmitTime.set( debounceKey, Date.now() );
+                        };
+
+                        // Helper: Setup timer with cooldown check
+                        const setupTimer = ( delaySeconds: number ) => {
+                            const timer = setTimeout( () => {
+                                const data = settings.userLastMessages.get( debounceKey );
+                                if ( data ) {
+                                    const cooldownCheck = canEmit( debounceKey );
+
+                                    if ( cooldownCheck.canEmit ) {
+                                        // Cooldown passed, emit message
+                                        emitMessage( data.socket, data.messageCreateOptions );
+
+                                        // Cleanup
+                                        settings.userMessageTimers.delete( debounceKey );
+                                        settings.userLastMessages.delete( debounceKey );
+                                    } else {
+                                        // Still in cooldown, retry after remaining time
+                                        console.log( `Cooldown active for ${message.author.username}, retrying in ${cooldownCheck.remainingSeconds}s` );
+                                        setupTimer( cooldownCheck.remainingSeconds );
+                                    }
+                                }
+                            }, delaySeconds * 1000 );
+
+                            settings.userMessageTimers.set( debounceKey, timer );
+                        };
+
+                        if ( debounceSeconds > 0 ) {
+                            // Debounce enabled: wait X seconds after last message before emitting
+                            // Clear existing timer if user sends another message
+                            if ( settings.userMessageTimers.has( debounceKey ) ) {
+                                clearTimeout( settings.userMessageTimers.get( debounceKey ) );
+                                console.log( `Debounce: Clearing previous timer for ${message.author.username}` );
+                            }
+
+                            // Store the latest message data
+                            settings.userLastMessages.set( debounceKey, {
+                                messageCreateOptions,
+                                socket: parameters.socket,
+                            } );
+
+                            // Set new timer (will check cooldown when it expires)
+                            setupTimer( debounceSeconds );
+                        } else {
+                            // No debounce: check cooldown and emit immediately
+                            const cooldownCheck = canEmit( debounceKey );
+
+                            if ( cooldownCheck.canEmit ) {
+                                // Cooldown passed or disabled, emit immediately
+                                console.log( "about to emit messageCreate", message.id );
+                                emitMessage( parameters.socket, messageCreateOptions );
+                            } else {
+                                // In cooldown, queue message with timer
+                                console.log( `Cooldown active for ${message.author.username}, queuing message for ${cooldownCheck.remainingSeconds}s` );
+
+                                // Clear existing timer if any
+                                if ( settings.userMessageTimers.has( debounceKey ) ) {
+                                    clearTimeout( settings.userMessageTimers.get( debounceKey ) );
+                                }
+
+                                // Store message and setup timer
+                                settings.userLastMessages.set( debounceKey, {
+                                    messageCreateOptions,
+                                    socket: parameters.socket,
+                                } );
+
+                                setupTimer( cooldownCheck.remainingSeconds );
+                            }
+                        }
                     }
 
                 } catch ( e ) {

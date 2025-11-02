@@ -320,6 +320,39 @@ export const checkChannelStatus = (channelId: string): Promise<{ isDisabled: boo
     });
 };
 
+// Get messages from channel
+export const getMessages = (token: string, channelId: string, limit: number = 10): Promise<any> => {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            console.log('getMessages timeout after 30 seconds');
+            reject(new Error('timeout'));
+        }, 30000);
+
+        ipc.config.retry = 1500;
+        configureIpc();
+
+        ipc.connectTo('bot', () => {
+            console.log('Connected to bot for getMessages, emitting send:action');
+
+            ipc.of.bot.on('callback:send:action', (data: any) => {
+                console.log('Received callback:send:action', data);
+                clearTimeout(timeout);
+                resolve(data);
+            });
+
+            ipc.of.bot.emit('send:action', {
+                token,
+                nodeParameters: {
+                    type: 'action',
+                    actionType: 'getMessages',
+                    channelId,
+                    getMessagesLimit: limit,
+                },
+            });
+        });
+    });
+};
+
 
 export const ipcRequest = (type: string, parameters: any): Promise<any> => {
     return new Promise((resolve) => {

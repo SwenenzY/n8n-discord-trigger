@@ -339,33 +339,39 @@ export default function () {
 
             console.log( "message created", message.id, message.content );
 
-            // Handle support commands (/support-close, /support-open)
+            // Handle support commands (/support-close, /support-open) - Bot-only, no n8n trigger
             if ( message.content === '/support-close' || message.content === '/support-open' ) {
-                const triggerMap = settings.triggerNodes[ token ];
-                for ( const [ nodeId, parameters ] of Object.entries( triggerMap ) as [ string, any ] ) {
-                    try {
-                        if ( parameters.type !== 'support-command' ) continue;
-
-                        // Check guild filter
-                        if ( parameters.guildIds && parameters.guildIds.length && message.guild && !parameters.guildIds.includes( message.guild.id ) )
-                            continue;
-
-                        // Emit to n8n for role check and response
-                        ipc.server.emit( parameters.socket, 'supportCommand', {
-                            command: message.content,
-                            message: message,
-                            author: message.author,
-                            channel: message.channel,
-                            guild: message.guild,
-                            memberRoles: message.member ? Array.from( message.member.roles.cache.values() ).map( ( r: any ) => ( {
-                                id: r.id,
-                                name: r.name,
-                            } ) ) : [],
-                            nodeId: nodeId,
-                        } );
-                    } catch ( e ) {
-                        console.log( e );
+                try {
+                    // Only works in guild channels (not DMs)
+                    if ( !message.guild || !message.member ) {
+                        await message.reply( 'This command can only be used in server channels.' );
+                        return;
                     }
+
+                    // Permission check: User must have MANAGE_CHANNELS permission
+                    if ( !message.member.permissions.has( 'ManageChannels' ) ) {
+                        await message.reply( 'You do not have permission to use this command. Required permission: Manage Channels' );
+                        return;
+                    }
+
+                    const channelId = message.channel.id;
+                    const action = message.content === '/support-close' ? 'close' : 'open';
+
+                    // Toggle channel status
+                    if ( action === 'close' ) {
+                        settings.disabledChannels.add( channelId );
+                        saveDisabledChannels( settings.disabledChannels );
+                        await message.reply( '✅ Ticket closed. This channel will no longer trigger workflows.' );
+                        console.log( `Channel ${channelId} disabled by ${message.author.tag}` );
+                    } else {
+                        settings.disabledChannels.delete( channelId );
+                        saveDisabledChannels( settings.disabledChannels );
+                        await message.reply( '✅ Ticket opened. This channel will now trigger workflows.' );
+                        console.log( `Channel ${channelId} enabled by ${message.author.tag}` );
+                    }
+                } catch ( e ) {
+                    console.error( 'Error handling support command:', e );
+                    await message.reply( '❌ An error occurred while processing the command.' ).catch( () => {} );
                 }
                 return; // Don't process as regular message
             }

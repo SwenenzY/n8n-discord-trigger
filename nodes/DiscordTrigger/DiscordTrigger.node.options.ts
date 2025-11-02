@@ -57,11 +57,6 @@ export const options: INodeProperties[] = [
 				value: 'user-update',
 				description: 'When a user is updated on the server (i.e. new role, removed role, nickname).',
 			},
-      {
-				name: 'Support Command',
-				value: 'support-command',
-				description: 'When /support-close or /support-open commands are used. Use this to manage support ticket channels with role-based permissions.',
-			},
     ],
     default: 'message',
     description: 'Type of event to listen to. User events must specify a channel to listen to if you want to use a placeholder or the option "send to the trigger channel" in a Discord Send node.',

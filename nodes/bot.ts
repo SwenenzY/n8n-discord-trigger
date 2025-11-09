@@ -769,22 +769,40 @@ export default async function () {
 
                     // Handle connection state
                     connection.on( VoiceConnectionStatus.Ready, () => {
-                        console.log( `Connected to voice channel: ${ channel.name }` );
+                        console.log( `✅ Voice connection READY for channel: ${ channel.name }` );
+                        console.log( `Voice connection state: ${connection.state.status}` );
 
                         // Start recording
                         const receiver = connection.receiver;
+                        console.log( `Voice receiver created, setting up speaking listeners...` );
+
                         const audioFormat = parameters.recordingOptions?.audioFormat || 'ogg';
                         const maxDuration = ( parameters.recordingOptions?.maxDuration || 60 ) * 1000;
                         const silenceTimeout = ( parameters.recordingOptions?.silenceTimeout || 2 ) * 1000;
 
+                        console.log( `Recording config - Format: ${audioFormat}, Max Duration: ${maxDuration}ms, Silence Timeout: ${silenceTimeout}ms` );
+
+                        // Debug: Check if receiver.speaking exists
+                        if (!receiver.speaking) {
+                            console.error( '❌ ERROR: receiver.speaking is undefined!' );
+                        } else {
+                            console.log( '✅ receiver.speaking is available, adding listeners...' );
+                        }
+
                         // Listen for speaking events
                         receiver.speaking.on( 'start', ( userId: string ) => {
-                            const member = channel.guild.members.cache.get( userId );
-                            if ( !member ) return;
+                            console.log( `🎤 Speaking START event received for user ID: ${userId}` );
 
-                            console.log( `${ member.user.username } started speaking` );
+                            const member = channel.guild.members.cache.get( userId );
+                            if ( !member ) {
+                                console.warn( `Could not find member for user ID: ${userId}` );
+                                return;
+                            }
+
+                            console.log( `${ member.user.username } (${userId}) started speaking` );
 
                             // Create audio stream for user
+                            console.log( `Subscribing to audio stream for ${member.user.username}...` );
                             const audioStream = receiver.subscribe( userId, {
                                 end: {
                                     behavior: EndBehaviorType.AfterSilence,
@@ -795,24 +813,39 @@ export default async function () {
                             const recordingKey = `${ userId }:${ channel.id }`;
                             const chunks: Buffer[] = [];
                             let recordingStartTime = Date.now();
+                            let dataReceived = false;
+
+                            console.log( `📼 Started recording for ${member.user.username} at ${new Date(recordingStartTime).toISOString()}` );
 
                             audioStream.on( 'data', ( chunk: Buffer ) => {
                                 // Check max duration
                                 if ( Date.now() - recordingStartTime < maxDuration ) {
                                     chunks.push( chunk );
+                                    if (!dataReceived) {
+                                        console.log( `🔊 First audio data received from ${member.user.username}, chunk size: ${chunk.length} bytes` );
+                                        dataReceived = true;
+                                    }
                                 }
                             } );
 
                             audioStream.on( 'end', async () => {
-                                console.log( `${ member.user.username } stopped speaking` );
+                                console.log( `🔴 ${ member.user.username } stopped speaking` );
+                                console.log( `Total chunks received: ${chunks.length}` );
 
                                 // Combine chunks
                                 const buffer = Buffer.concat( chunks );
                                 const duration = ( Date.now() - recordingStartTime ) / 1000;
 
+                                console.log( `Recording stats - Duration: ${duration}s, Buffer size: ${buffer.length} bytes` );
+
                                 // Check minimum speaking duration
                                 const minDuration = ( parameters.recordingOptions?.minSpeakingDuration || 100 ) / 1000;
-                                if ( duration < minDuration ) return;
+                                if ( duration < minDuration ) {
+                                    console.log( `⏭️ Recording too short (${duration}s < ${minDuration}s), skipping...` );
+                                    return;
+                                }
+
+                                console.log( `✅ Recording meets minimum duration, processing...` );
 
                                 // Process recording
                                 const recordingData = {
@@ -845,7 +878,9 @@ export default async function () {
                                 }
 
                                 // Emit recording event
+                                console.log( `📡 Emitting voice recording to workflow, socket: ${parameters.socket ? 'exists' : 'missing'}` );
                                 if ( parameters.socket ) {
+                                    console.log( `Sending voiceRecording event to node ${nodeId}` );
                                     ipc.server.emit( parameters.socket, 'voiceRecording', {
                                         recording: recordingData,
                                         user: {

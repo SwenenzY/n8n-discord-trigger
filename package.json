@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-discord-trigger-new",
-  "version": "0.11.3",
+  "version": "0.11.6",
   "description": "A node that triggers a workflow whenever a message from discord is sent.",
   "keywords": [
     "n8n",

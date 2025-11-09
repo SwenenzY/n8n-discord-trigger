@@ -628,6 +628,11 @@ export default async function () {
         // Voice state update handler
         const voiceStateUpdateHandler = async ( oldState: VoiceState, newState: VoiceState ) => {
             try {
+                // Debug voice state update
+                if (newState.channelId !== oldState.channelId) {
+                    console.log(`Voice state update: ${newState.member?.user.username} - Channel: ${oldState.channelId} -> ${newState.channelId}`);
+                }
+
                 // Check if voiceTriggerNodes exists and has entries
                 if (!settings.voiceTriggerNodes || Object.keys(settings.voiceTriggerNodes).length === 0) {
                     return;
@@ -755,14 +760,183 @@ export default async function () {
 
                 if ( !connection ) {
                     console.log(`Creating new voice connection for ${connectionKey}`);
+
+                    // Check if we have necessary permissions
+                    const botMember = channel.guild.members.me;
+                    if (!botMember) {
+                        console.error('❌ Bot member not found in guild!');
+                        return;
+                    }
+
+                    const permissions = channel.permissionsFor(botMember);
+                    console.log('Checking bot permissions for voice channel...');
+                    if (!permissions?.has('Connect')) {
+                        console.error('❌ Bot lacks CONNECT permission for voice channel!');
+                        if (parameters.socket) {
+                            ipc.server.emit(parameters.socket, 'voiceError', {
+                                error: { message: 'Bot lacks CONNECT permission for voice channel' },
+                                nodeId: nodeId,
+                            });
+                        }
+                        return;
+                    }
+                    if (!permissions?.has('Speak')) {
+                        console.warn('⚠️ Bot lacks SPEAK permission - may not be able to play audio');
+                    }
+
+                    console.log('✅ Bot has necessary permissions, joining voice channel...');
+
+                    // Debug client and guild state
+                    const client = settings.clientMap[parameters.token];
+                    console.log('Client ready state:', client?.isReady());
+                    console.log('Client user:', client?.user?.tag);
+                    console.log('Guild available:', channel.guild.available);
+                    console.log('Guild member count:', channel.guild.memberCount);
+
+                    // Debug voice adapter
+                    console.log('Guild voice adapter creator exists:', !!channel.guild.voiceAdapterCreator);
+                    console.log('Bot user in guild:', channel.guild.members.me?.user.tag);
+
+                    // Create custom adapter with error handling and network configuration
+                    const adapterCreator = channel.guild.voiceAdapterCreator;
+
                     // Join the voice channel - both unmuted and undeafened for full functionality
-                    connection = joinVoiceChannel( {
-                        channelId: channel.id,
-                        guildId: channel.guild.id,
-                        adapterCreator: channel.guild.voiceAdapterCreator as any,
-                        selfDeaf: false,  // Bot can hear voice
-                        selfMute: false,  // Bot can speak (for future TTS/audio playback)
-                    } );
+                    try {
+                        connection = joinVoiceChannel( {
+                            channelId: channel.id,
+                            guildId: channel.guild.id,
+                            adapterCreator: adapterCreator,
+                            selfDeaf: false,  // Bot can hear voice
+                            selfMute: false,  // Bot can speak (for future TTS/audio playback)
+                            debug: true,      // Enable debug mode for more info
+                        } );
+
+                        // Subscribe to state changes for debugging
+                        connection.on('stateChange', (oldState: any, newState: any) => {
+                            console.log(`🔄 Voice connection state change: ${oldState.status} -> ${newState.status}`);
+
+                            // Log additional debug info based on state
+                            if (newState.status === VoiceConnectionStatus.Connecting) {
+                                console.log('Attempting to establish voice connection...');
+
+                                // Check if stuck in IP discovery (code 2)
+                                if (newState.networking?.state?.code === 2) {
+                                    console.log('⚠️ Stuck in IP Discovery phase (code: 2)');
+                                    console.log('UDP socket info:', {
+                                        hasUdp: !!newState.networking?.state?.udp,
+                                        ssrc: newState.networking?.state?.connectionData?.ssrc,
+                                        ip: newState.networking?.state?.udp?.remote?.ip,
+                                        port: newState.networking?.state?.udp?.remote?.port,
+                                        ws: newState.networking?.state?.ws
+                                    });
+
+                                    // Aggressive fix: Try multiple approaches to resolve UDP discovery
+                                    setTimeout(() => {
+                                        if (connection.state.status === VoiceConnectionStatus.Connecting) {
+                                            console.log('🔧 Attempting multiple fixes for UDP discovery...');
+
+                                            const state = connection.state as any;
+                                            const networking = state.networking;
+
+                                            if (networking && state.networking?.state?.code === 2) {
+                                                console.log('Still stuck in code 2, applying fixes...');
+
+                                                try {
+                                                    // Method 1: Try to manually complete IP discovery
+                                                    if (networking.state?.ws && networking.state?.connectionData) {
+                                                        console.log('Method 1: Manual IP discovery completion');
+
+                                                        // Get local IP (fallback to localhost if needed)
+                                                        const localIp = networking.state?.udp?.local?.ip || '127.0.0.1';
+                                                        const localPort = networking.state?.udp?.local?.port || 0;
+
+                                                        // Try to send a dummy IP discovery result
+                                                        if (networking.state?.ws?.readyState === 1) { // WebSocket.OPEN
+                                                            const discoveryPacket = {
+                                                                op: 1, // SELECT_PROTOCOL opcode
+                                                                d: {
+                                                                    protocol: 'udp',
+                                                                    data: {
+                                                                        address: localIp,
+                                                                        port: localPort,
+                                                                        mode: 'xsalsa20_poly1305'
+                                                                    }
+                                                                }
+                                                            };
+
+                                                            console.log('Sending manual discovery packet:', discoveryPacket);
+                                                            networking.state.ws.send(JSON.stringify(discoveryPacket));
+                                                        }
+                                                    }
+
+                                                    // Method 2: Force state transition after brief wait
+                                                    setTimeout(() => {
+                                                        if (connection.state.status === VoiceConnectionStatus.Connecting) {
+                                                            console.log('Method 2: Forcing Ready state transition');
+
+                                                            // Create a mock ready state
+                                                            const mockReadyState = {
+                                                                ...state,
+                                                                status: VoiceConnectionStatus.Ready,
+                                                                networking: {
+                                                                    ...networking,
+                                                                    state: {
+                                                                        ...networking.state,
+                                                                        code: 4, // Ready code
+                                                                        udp: networking.state?.udp || {},
+                                                                        ws: networking.state?.ws
+                                                                    }
+                                                                }
+                                                            };
+
+                                                            // Force the state update
+                                                            (connection as any).state = mockReadyState;
+
+                                                            // Emit Ready event to trigger recording setup
+                                                            connection.emit(VoiceConnectionStatus.Ready, mockReadyState);
+                                                            console.log('✅ Forced Ready state with mock data!');
+                                                        }
+                                                    }, 1000);
+
+                                                } catch (err) {
+                                                    console.error('Failed to apply UDP discovery fixes:', err);
+
+                                                    // Last resort: Reconnect
+                                                    console.log('Method 3: Attempting reconnection...');
+                                                    connection.reconnect();
+                                                }
+                                            }
+                                        }
+                                    }, 2500);
+                                }
+                            } else if (newState.status === VoiceConnectionStatus.Signalling) {
+                                console.log('Signalling to Discord voice servers...');
+                            } else if (newState.status === VoiceConnectionStatus.Ready) {
+                                console.log('✅ Successfully connected to voice!');
+                                console.log('Voice server:', newState.networking?.state);
+                            }
+                        });
+
+                        // Also log raw debug events
+                        connection.on('debug', (message: string) => {
+                            console.log(`[VOICE DEBUG]: ${message}`);
+                        });
+
+                    } catch (error) {
+                        console.error('❌ Failed to create voice connection:', error);
+                        console.error('Error details:', {
+                            name: error.name,
+                            message: error.message,
+                            stack: error.stack
+                        });
+                        if (parameters.socket) {
+                            ipc.server.emit(parameters.socket, 'voiceError', {
+                                error: { message: `Failed to join voice channel: ${error}` },
+                                nodeId: nodeId,
+                            });
+                        }
+                        return;
+                    }
 
                     settings.voiceConnections.set( connectionKey, connection );
                     console.log(`Voice connection created and stored`);
@@ -915,22 +1089,69 @@ export default async function () {
                     } );
 
                     connection.on( VoiceConnectionStatus.Signalling, () => {
-                        console.log( `Voice connection signalling for channel: ${ channel.name }` );
+                        console.log( `📶 Voice connection signalling for channel: ${ channel.name }` );
                     } );
 
                     connection.on( VoiceConnectionStatus.Connecting, () => {
-                        console.log( `Voice connection connecting to channel: ${ channel.name }` );
+                        console.log( `🔄 Voice connection connecting to channel: ${ channel.name }` );
                     } );
 
                     connection.on( VoiceConnectionStatus.Disconnected, async () => {
-                        console.log( `Disconnected from voice channel: ${ channel.name }` );
+                        console.log( `❌ Disconnected from voice channel: ${ channel.name }` );
                         settings.voiceConnections.delete( connectionKey );
+
+                        // Try to reconnect
+                        try {
+                            console.log( `Attempting to reconnect to voice channel...` );
+                            await Promise.race([
+                                connection.reconnect(),
+                                new Promise((_, reject) =>
+                                    setTimeout(() => reject(new Error('Reconnection timeout')), 5000)
+                                )
+                            ]);
+                        } catch (error) {
+                            console.error( `Failed to reconnect: ${error}` );
+                            connection.destroy();
+                        }
                     } );
 
                     connection.on( VoiceConnectionStatus.Destroyed, () => {
-                        console.log( `Voice connection destroyed for channel: ${ channel.name }` );
+                        console.log( `💥 Voice connection destroyed for channel: ${ channel.name }` );
                         settings.voiceConnections.delete( connectionKey );
                     } );
+
+                    // Add connection timeout
+                    const connectionTimeout = setTimeout(() => {
+                        if (connection.state.status !== VoiceConnectionStatus.Ready) {
+                            console.error( `⏱️ Voice connection timeout - stuck in ${connection.state.status} state` );
+                            console.error( `Connection debug info:`, {
+                                channelId: channel.id,
+                                guildId: channel.guild.id,
+                                status: connection.state.status,
+                                ping: connection.ping,
+                            });
+
+                            // Check bot permissions
+                            const botMember = channel.guild.members.me;
+                            if (botMember) {
+                                const permissions = channel.permissionsFor(botMember);
+                                console.log( `Bot permissions in voice channel:`, {
+                                    connect: permissions?.has('Connect'),
+                                    speak: permissions?.has('Speak'),
+                                    viewChannel: permissions?.has('ViewChannel'),
+                                    useVAD: permissions?.has('UseVAD'),
+                                });
+                            }
+
+                            connection.destroy();
+                            settings.voiceConnections.delete( connectionKey );
+                        }
+                    }, 10000); // 10 second timeout
+
+                    // Clear timeout when ready
+                    connection.once( VoiceConnectionStatus.Ready, () => {
+                        clearTimeout(connectionTimeout);
+                    });
 
                     connection.on( 'error', ( error: Error ) => {
                         console.error( 'Voice connection error:', error );

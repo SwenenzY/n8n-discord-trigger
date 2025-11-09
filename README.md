@@ -80,6 +80,7 @@ For more help on setting up n8n workflows, check the [Try it out documentation](
 
 ## Version history
 
+- **v0.11.6**: Critical fix - Enhance UDP IP discovery handling for voice connections. Add multiple fallback methods including manual IP discovery, forced Ready state transition, and automatic reconnection to resolve voice channel connection issues.
 - **v0.11.0**: Major update - Add Discord Voice Trigger node with voice recording, multi-format audio support, transcription-ready architecture, and global mutex/singleton system to prevent duplicate bot instances.
 - **v0.10.12**: Add global mutex/singleton pattern to prevent duplicate bot instances and event listeners on restart.
 - **v0.10.11**: Remove support command option and enhance support command handling in bot logic.

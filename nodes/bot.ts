@@ -755,11 +755,13 @@ export default async function () {
 
                 if ( !connection ) {
                     console.log(`Creating new voice connection for ${connectionKey}`);
-                    // Join the voice channel
+                    // Join the voice channel - both unmuted and undeafened for full functionality
                     connection = joinVoiceChannel( {
                         channelId: channel.id,
                         guildId: channel.guild.id,
                         adapterCreator: channel.guild.voiceAdapterCreator as any,
+                        selfDeaf: false,  // Bot can hear voice
+                        selfMute: false,  // Bot can speak (for future TTS/audio playback)
                     } );
 
                     settings.voiceConnections.set( connectionKey, connection );

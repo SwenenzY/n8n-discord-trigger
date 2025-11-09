@@ -43,6 +43,7 @@ const settings: {
     credentials: { [token: string]: { token: string; clientId: string } };
 
     triggerNodes: { [token: string]: { [nodeId: string]: any } };
+    voiceTriggerNodes: { [nodeId: string]: any }; // Voice trigger nodes
 
     // Support ticket channel management
     disabledChannels: Set<string>;
@@ -51,6 +52,10 @@ const settings: {
     userMessageTimers: Map<string, NodeJS.Timeout>; // key: "channelId:userId:nodeId" -> timer
     userLastMessages: Map<string, any>; // key: "channelId:userId:nodeId" -> last message data
     lastEmitTime: Map<string, number>; // key: "channelId:userId:nodeId" -> timestamp of last emit (for cooldown)
+
+    // Voice connections and recordings
+    voiceConnections: Map<string, any>; // key: "guildId:channelId" -> connection
+    voiceRecordings: Map<string, any>; // key: "userId:channelId" -> recording data
 } = {
     ready: false,
     login: false,
@@ -61,6 +66,7 @@ const settings: {
     parameters: {},
 
     triggerNodes: {},
+    voiceTriggerNodes: {},
 
     readyClients: {},
     loginQueue: {},
@@ -71,6 +77,8 @@ const settings: {
     userMessageTimers: new Map(),
     userLastMessages: new Map(),
     lastEmitTime: new Map(),
+    voiceConnections: new Map(),
+    voiceRecordings: new Map(),
 }
 
 export default settings;

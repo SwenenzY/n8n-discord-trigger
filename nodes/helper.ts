@@ -262,6 +262,57 @@ export const getRoles = async (that: any, selectedGuildIds: string[]): Promise<I
     ];
 };
 
+export const getVoiceChannels = async (that: any, guildIds: string[]): Promise<INodePropertyOptions[]> => {
+    const endMessage = ' - Close and reopen this node modal once you have made changes.';
+
+    const credentials = await that.getCredentials('discordBotTriggerApi').catch((e: any) => e);
+    const res = await connection(credentials).catch((e) => e);
+    if (!['ready', 'already'].includes(res)) {
+        return [
+            {
+                name: res + endMessage,
+                value: 'false',
+            },
+        ];
+    }
+
+    const voiceChannelsRequest = () =>
+        new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(''), 15000);
+
+            ipc.config.retry = 1500;
+            configureIpc();
+
+            ipc.connectTo('bot', () => {
+                ipc.of.bot.emit('list:voiceChannels', {guildIds: guildIds, token: credentials.token});
+
+                ipc.of.bot.on('list:voiceChannels', (data: { name: string; value: string }[]) => {
+                    clearTimeout(timeout);
+                    resolve(data);
+                });
+            });
+        });
+
+    const voiceChannels = await voiceChannelsRequest().catch((e) => e);
+
+    let message = 'Unexpected error';
+
+    if (voiceChannels) {
+        if (Array.isArray(voiceChannels) && voiceChannels.length) return voiceChannels;
+        else
+            message =
+                'Your Discord server has no voice channels, please add at least one voice channel' +
+                endMessage;
+    }
+
+    return [
+        {
+            name: message,
+            value: 'false',
+        },
+    ];
+};
+
 
 export const checkWorkflowStatus = async (n8nApiUrl: String, apiToken: String, workflowId: String): Promise<boolean> => {
     const apiUrl = `${removeTrailingSlash(n8nApiUrl)}/workflows/${workflowId}`;

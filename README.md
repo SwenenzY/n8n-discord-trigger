@@ -43,6 +43,10 @@ With this node, you can:
 - Send interactive confirmation messages with custom button labels.
 - Track guild member updates and role changes.
 - Handle multiple bot instances with multi-credential support.
+- **NEW: Voice Channel Support** - Record and process voice conversations.
+- **NEW: Voice Activity Detection** - Trigger workflows when users speak.
+- **NEW: Audio Recording** - Capture voice data in multiple formats (OGG, PCM, WebM).
+- **NEW: Transcription Ready** - Built-in support for speech-to-text services.
 
 
 
@@ -76,6 +80,8 @@ For more help on setting up n8n workflows, check the [Try it out documentation](
 
 ## Version history
 
+- **v0.11.0**: Major update - Add Discord Voice Trigger node with voice recording, multi-format audio support, transcription-ready architecture, and global mutex/singleton system to prevent duplicate bot instances.
+- **v0.10.12**: Add global mutex/singleton pattern to prevent duplicate bot instances and event listeners on restart.
 - **v0.10.11**: Remove support command option and enhance support command handling in bot logic.
 - **v0.10.10**: Implement client cleanup on restart and add global cleanup handlers for process termination.
 - **v0.10.9**: Fix debounce and cooldown settings to use additionalFields for better organization.

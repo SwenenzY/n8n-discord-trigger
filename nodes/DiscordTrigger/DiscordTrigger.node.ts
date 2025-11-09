@@ -36,7 +36,7 @@ function configureIpc() {
 if (!(global as any).__discordBotStarted) {
     if (!process.send || process.platform !== 'win32') {
         console.log('Starting Discord bot IPC server...');
-        bot();
+        bot().catch(err => console.error('Error starting Discord bot:', err));
         (global as any).__discordBotStarted = true;
     }
 }

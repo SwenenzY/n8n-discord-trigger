@@ -10,7 +10,16 @@ import {
     Partials,
     MessageComponentInteraction,
     ButtonStyle,
+    VoiceChannel,
+    VoiceState,
 } from 'discord.js';
+import {
+    joinVoiceChannel,
+    EndBehaviorType,
+    VoiceConnectionStatus,
+} from '@discordjs/voice';
+import * as fs from 'fs';
+import * as path from 'path';
 
 
 import ipc from 'node-ipc';
@@ -19,8 +28,21 @@ import {
 } from './helper';
 import settings, { saveDisabledChannels } from './settings';
 import { IDiscordInteractionMessageParameters, IDiscordNodeActionParameters } from './DiscordInteraction/DiscordInteraction.node';
+import BotSingleton from './botSingleton';
 
-export default function () {
+export default async function () {
+    const botSingleton = BotSingleton.getInstance();
+
+    // Try to acquire lock
+    const hasLock = await botSingleton.acquireLock();
+
+    if (!hasLock) {
+        console.log('Discord bot is already running in another process, connecting to existing IPC server...');
+        return;
+    }
+
+    console.log('Starting Discord bot with exclusive lock...');
+
     ipc.config.id = 'bot';
     ipc.config.retry = 1500;
     ipc.config.silent = true;
@@ -36,6 +58,16 @@ export default function () {
     }
 
     function spawnClient ( token: string, clientId: string ): Client {
+        const botSingleton = BotSingleton.getInstance();
+
+        // Check if client already exists
+        const existingClient = botSingleton.getClient(token);
+        if (existingClient) {
+            console.log(`Reusing existing Discord client for token ${token.substring(0, 10)}...`);
+            return existingClient;
+        }
+
+        console.log(`Creating new Discord client for token ${token.substring(0, 10)}...`);
 
         const client = new Client( {
             intents: [
@@ -49,6 +81,7 @@ export default function () {
                 GatewayIntentBits.DirectMessages,
                 GatewayIntentBits.DirectMessageReactions,
                 GatewayIntentBits.MessageContent,
+                GatewayIntentBits.GuildVoiceStates, // Add voice states for voice channel support
             ],
             allowedMentions: {
                 parse: [ 'roles', 'users', 'everyone' ],
@@ -592,10 +625,302 @@ export default function () {
             }
         };
 
+        // Voice state update handler
+        const voiceStateUpdateHandler = async ( oldState: VoiceState, newState: VoiceState ) => {
+            try {
+                // Check for voice trigger nodes
+                for ( const [ nodeId, parameters ] of Object.entries( settings.voiceTriggerNodes ) as [ string, any ] ) {
+                    // Check if this is the correct guild
+                    if ( parameters.guildIds && parameters.guildIds.length && !parameters.guildIds.includes( newState.guild.id ) )
+                        continue;
+
+                    // Check if this is the correct voice channel
+                    if ( parameters.voiceChannelIds && parameters.voiceChannelIds.length ) {
+                        const channelId = newState.channelId || oldState.channelId;
+                        if ( !channelId || !parameters.voiceChannelIds.includes( channelId ) )
+                            continue;
+                    }
+
+                    // Filter bots if needed
+                    if ( parameters.userFilters?.ignoreBots && newState.member?.user.bot )
+                        continue;
+
+                    // Check specific user IDs if configured
+                    if ( parameters.userFilters?.userIds ) {
+                        const userIds = parameters.userFilters.userIds.split( ',' ).map( ( id: string ) => id.trim() );
+                        if ( userIds.length && !userIds.includes( newState.member?.user.id ) )
+                            continue;
+                    }
+
+                    // Check roles if configured
+                    if ( parameters.userFilters?.roleIds && parameters.userFilters.roleIds.length ) {
+                        const memberRoles = newState.member?.roles.cache.map( ( role: any ) => role.id );
+                        const hasRole = parameters.userFilters.roleIds.some( ( role: any ) => memberRoles?.includes( role ) );
+                        if ( !hasRole )
+                            continue;
+                    }
+
+                    const voiceMode = parameters.voiceMode || 'voice-recording';
+
+                    // Handle different voice modes
+                    if ( voiceMode === 'voice-state' ) {
+                        // Send voice state update event
+                        if ( parameters.socket ) {
+                            ipc.server.emit( parameters.socket, 'voiceStateUpdate', {
+                                oldState: {
+                                    channelId: oldState.channelId,
+                                    selfMute: oldState.selfMute,
+                                    selfDeaf: oldState.selfDeaf,
+                                    serverMute: oldState.serverMute,
+                                    serverDeaf: oldState.serverDeaf,
+                                    streaming: oldState.streaming,
+                                    selfVideo: oldState.selfVideo,
+                                },
+                                newState: {
+                                    channelId: newState.channelId,
+                                    selfMute: newState.selfMute,
+                                    selfDeaf: newState.selfDeaf,
+                                    serverMute: newState.serverMute,
+                                    serverDeaf: newState.serverDeaf,
+                                    streaming: newState.streaming,
+                                    selfVideo: newState.selfVideo,
+                                    channel: newState.channel ? {
+                                        id: newState.channel.id,
+                                        name: newState.channel.name,
+                                    } : null,
+                                },
+                                member: {
+                                    id: newState.member?.id,
+                                    user: {
+                                        id: newState.member?.user.id,
+                                        username: newState.member?.user.username,
+                                        discriminator: newState.member?.user.discriminator,
+                                    }
+                                },
+                                guild: {
+                                    id: newState.guild.id,
+                                    name: newState.guild.name,
+                                },
+                                nodeId: nodeId
+                            } );
+                        }
+                    } else if ( voiceMode === 'voice-recording' && newState.channelId && !oldState.channelId ) {
+                        // User joined a voice channel - start recording if configured
+                        const autoJoin = parameters.additionalOptions?.autoJoin !== false;
+                        if ( autoJoin && newState.channel ) {
+                            await handleVoiceRecording( newState, nodeId, parameters );
+                        }
+                    } else if ( voiceMode === 'voice-activity' ) {
+                        // Handle voice activity detection
+                        // This will be implemented with speaking events
+                    }
+                }
+            } catch ( e ) {
+                console.error( 'Error in voiceStateUpdate:', e );
+            }
+        };
+
+        // Function to handle voice recording
+        async function handleVoiceRecording( voiceState: VoiceState, nodeId: string, parameters: any ) {
+            try {
+                const channel = voiceState.channel as VoiceChannel;
+                if ( !channel ) return;
+
+                const connectionKey = `${ voiceState.guild.id }:${ channel.id }`;
+
+                // Check if already connected
+                let connection = settings.voiceConnections.get( connectionKey );
+
+                if ( !connection ) {
+                    // Join the voice channel
+                    connection = joinVoiceChannel( {
+                        channelId: channel.id,
+                        guildId: channel.guild.id,
+                        adapterCreator: channel.guild.voiceAdapterCreator as any,
+                    } );
+
+                    settings.voiceConnections.set( connectionKey, connection );
+
+                    // Handle connection state
+                    connection.on( VoiceConnectionStatus.Ready, () => {
+                        console.log( `Connected to voice channel: ${ channel.name }` );
+
+                        // Start recording
+                        const receiver = connection.receiver;
+                        const audioFormat = parameters.recordingOptions?.audioFormat || 'ogg';
+                        const maxDuration = ( parameters.recordingOptions?.maxDuration || 60 ) * 1000;
+                        const silenceTimeout = ( parameters.recordingOptions?.silenceTimeout || 2 ) * 1000;
+
+                        // Listen for speaking events
+                        receiver.speaking.on( 'start', ( userId: string ) => {
+                            const member = channel.guild.members.cache.get( userId );
+                            if ( !member ) return;
+
+                            console.log( `${ member.user.username } started speaking` );
+
+                            // Create audio stream for user
+                            const audioStream = receiver.subscribe( userId, {
+                                end: {
+                                    behavior: EndBehaviorType.AfterSilence,
+                                    duration: silenceTimeout,
+                                },
+                            } );
+
+                            const recordingKey = `${ userId }:${ channel.id }`;
+                            const chunks: Buffer[] = [];
+                            let recordingStartTime = Date.now();
+
+                            audioStream.on( 'data', ( chunk: Buffer ) => {
+                                // Check max duration
+                                if ( Date.now() - recordingStartTime < maxDuration ) {
+                                    chunks.push( chunk );
+                                }
+                            } );
+
+                            audioStream.on( 'end', async () => {
+                                console.log( `${ member.user.username } stopped speaking` );
+
+                                // Combine chunks
+                                const buffer = Buffer.concat( chunks );
+                                const duration = ( Date.now() - recordingStartTime ) / 1000;
+
+                                // Check minimum speaking duration
+                                const minDuration = ( parameters.recordingOptions?.minSpeakingDuration || 100 ) / 1000;
+                                if ( duration < minDuration ) return;
+
+                                // Process recording
+                                const recordingData = {
+                                    buffer: buffer,
+                                    duration: duration,
+                                    format: audioFormat,
+                                };
+
+                                // Save to file if configured
+                                if ( parameters.additionalOptions?.saveToFile ) {
+                                    const filePath = parameters.additionalOptions.filePath || './recordings';
+                                    const fileName = `${ userId }_${ Date.now() }.${ audioFormat }`;
+                                    const fullPath = path.join( filePath, fileName );
+
+                                    // Ensure directory exists
+                                    if ( !fs.existsSync( filePath ) ) {
+                                        fs.mkdirSync( filePath, { recursive: true } );
+                                    }
+
+                                    fs.writeFileSync( fullPath, buffer );
+                                    ( recordingData as any ).filePath = fullPath;
+                                }
+
+                                // Handle transcription if enabled
+                                let transcription = null;
+                                if ( parameters.transcription?.enabled ) {
+                                    // Transcription would be handled here
+                                    // This would integrate with external services
+                                    console.log( 'Transcription requested but not implemented yet' );
+                                }
+
+                                // Emit recording event
+                                if ( parameters.socket ) {
+                                    ipc.server.emit( parameters.socket, 'voiceRecording', {
+                                        recording: recordingData,
+                                        user: {
+                                            id: member.user.id,
+                                            username: member.user.username,
+                                            discriminator: member.user.discriminator,
+                                        },
+                                        channel: {
+                                            id: channel.id,
+                                            name: channel.name,
+                                        },
+                                        guild: {
+                                            id: channel.guild.id,
+                                            name: channel.guild.name,
+                                        },
+                                        nodeId: nodeId,
+                                        transcription: transcription,
+                                    } );
+                                }
+
+                                // Clear recording data
+                                settings.voiceRecordings.delete( recordingKey );
+                            } );
+
+                            // Store recording info
+                            settings.voiceRecordings.set( recordingKey, {
+                                stream: audioStream,
+                                startTime: recordingStartTime,
+                                userId: userId,
+                            } );
+                        } );
+                    } );
+
+                    connection.on( VoiceConnectionStatus.Disconnected, async () => {
+                        console.log( `Disconnected from voice channel: ${ channel.name }` );
+                        settings.voiceConnections.delete( connectionKey );
+                    } );
+
+                    connection.on( 'error', ( error: Error ) => {
+                        console.error( 'Voice connection error:', error );
+                        if ( parameters.socket ) {
+                            ipc.server.emit( parameters.socket, 'voiceError', {
+                                error: { message: error.message },
+                                nodeId: nodeId,
+                            } );
+                        }
+                    } );
+                }
+
+                // Handle auto-leave
+                if ( parameters.additionalOptions?.autoLeave !== false ) {
+                    // Check if channel is empty
+                    setTimeout( () => {
+                        const members = channel.members.filter( m => !m.user.bot );
+                        if ( members.size === 0 && connection ) {
+                            connection.destroy();
+                            settings.voiceConnections.delete( connectionKey );
+                            console.log( `Left empty voice channel: ${ channel.name }` );
+                        }
+                    }, 5000 );
+                }
+
+            } catch ( e ) {
+                console.error( 'Error handling voice recording:', e );
+                if ( parameters.socket ) {
+                    ipc.server.emit( parameters.socket, 'voiceError', {
+                        error: { message: ( e as Error ).message },
+                        nodeId: nodeId,
+                    } );
+                }
+            }
+        }
+
         client.once( 'ready', () => {
-            client.on( 'messageCreate', onMessageCreate );
-            if ( client.user )
-                console.log( `Discord bot (${ client.user.id }) is ready and listening for messages` );
+            const botSingleton = BotSingleton.getInstance();
+
+            // Check if we already have event listeners to prevent duplicates
+            const messageListenerKey = `${token}-messageCreate`;
+            if (!botSingleton.hasEventListener(messageListenerKey, onMessageCreate)) {
+                client.on( 'messageCreate', onMessageCreate );
+                botSingleton.addEventListener(messageListenerKey, onMessageCreate);
+                console.log(`Added messageCreate listener for token ${token.substring(0, 10)}...`);
+            } else {
+                console.log(`MessageCreate listener already exists for token ${token.substring(0, 10)}...`);
+            }
+
+            // Add voice state update listener
+            const voiceListenerKey = `${token}-voiceStateUpdate`;
+            if (!botSingleton.hasEventListener(voiceListenerKey, voiceStateUpdateHandler)) {
+                client.on( 'voiceStateUpdate', voiceStateUpdateHandler );
+                botSingleton.addEventListener(voiceListenerKey, voiceStateUpdateHandler);
+                console.log(`Added voiceStateUpdate listener for token ${token.substring(0, 10)}...`);
+            } else {
+                console.log(`VoiceStateUpdate listener already exists for token ${token.substring(0, 10)}...`);
+            }
+
+            if ( client.user ) {
+                console.log( `Discord bot (${ client.user.id }) is ready and listening for messages and voice` );
+                // Store client in singleton
+                botSingleton.setClient(token, client);
+            }
         } );
 
         client.login( token ).catch( console.error );
@@ -624,6 +949,37 @@ export default function () {
             console.log( `Removing trigger node: ${ data.nodeId }` );
             for ( const token in settings.triggerNodes ) {
                 delete settings.triggerNodes[ token ][ data.nodeId ];
+            }
+        } );
+
+        // Voice trigger node registration
+        ipc.server.on( 'voiceTriggerNodeRegistered', ( data: any, socket: any ) => {
+            console.log( `Voice trigger node registered: ${ data.nodeId }` );
+            settings.voiceTriggerNodes[ data.nodeId ] = {
+                ...data.parameters,
+                socket: socket,
+                token: data.token,
+            };
+        } );
+
+        ipc.server.on( 'voiceTriggerNodeRemoved', ( data: { nodeId: string }, socket: any ) => {
+            console.log( `Removing voice trigger node: ${ data.nodeId }` );
+            delete settings.voiceTriggerNodes[ data.nodeId ];
+
+            // Clean up any active voice connections for this node
+            for ( const [ key, connection ] of settings.voiceConnections.entries() ) {
+                // Destroy connection if no other nodes are using it
+                let connectionInUse = false;
+                for ( const nodeParams of Object.values( settings.voiceTriggerNodes ) ) {
+                    if ( ( nodeParams as any ).voiceChannelIds?.some( ( id: string ) => key.includes( id ) ) ) {
+                        connectionInUse = true;
+                        break;
+                    }
+                }
+                if ( !connectionInUse ) {
+                    ( connection as any ).destroy();
+                    settings.voiceConnections.delete( key );
+                }
             }
         } );
 
@@ -720,6 +1076,31 @@ export default function () {
                 }
 
                 ipc.server.emit( socket, 'list:categories', categoriesList );
+            } catch ( e ) {
+                console.log( `${ e }` );
+            }
+        } );
+
+        // List voice channels handler
+        ipc.server.on( 'list:voiceChannels', ( data: { guildIds: string[], token: string }, socket: any ) => {
+            try {
+                const client = settings.clientMap[ data.token ];
+                if ( !client || !settings.readyClients[ data.token ] ) return;
+
+                const guilds = client.guilds.cache.filter( guild => data.guildIds.includes( `${ guild.id }` ) );
+                const voiceChannelsList = [] as { name: string; value: string }[];
+
+                for ( const guild of guilds.values() ) {
+                    const voiceChannels = guild.channels.cache.filter( ( channel: any ) => channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildStageVoice );
+                    for ( const channel of voiceChannels.values() ) {
+                        voiceChannelsList.push( {
+                            name: `${guild.name} - ${channel.name}`,
+                            value: channel.id,
+                        } );
+                    }
+                }
+
+                ipc.server.emit( socket, 'list:voiceChannels', voiceChannelsList );
             } catch ( e ) {
                 console.log( `${ e }` );
             }
@@ -1080,6 +1461,7 @@ export default function () {
     // Cleanup function to destroy all clients and timers
     const cleanup = () => {
         console.log( 'Cleaning up Discord clients and timers...' );
+        const botSingleton = BotSingleton.getInstance();
 
         // Clear all debounce/cooldown timers
         for ( const timer of settings.userMessageTimers.values() ) {
@@ -1088,6 +1470,19 @@ export default function () {
         settings.userMessageTimers.clear();
         settings.userLastMessages.clear();
         settings.lastEmitTime.clear();
+
+        // Clear voice connections
+        for ( const connection of settings.voiceConnections.values() ) {
+            try {
+                if ( connection && connection.destroy ) {
+                    connection.destroy();
+                }
+            } catch ( e ) {
+                console.error( 'Error destroying voice connection:', e );
+            }
+        }
+        settings.voiceConnections.clear();
+        settings.voiceRecordings.clear();
 
         // Destroy all Discord clients
         for ( const token in settings.clientMap ) {
@@ -1102,6 +1497,12 @@ export default function () {
         settings.clientMap = {};
         settings.readyClients = {};
         settings.triggerNodes = {};
+        settings.voiceTriggerNodes = {};
+
+        // Clear singleton event listeners and release lock
+        botSingleton.clearAllEventListeners();
+        botSingleton.release();
+        console.log( 'Bot singleton lock released and cleaned up' );
     };
 
     // Register cleanup handlers for process termination

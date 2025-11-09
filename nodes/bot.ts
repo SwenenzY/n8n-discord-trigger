@@ -628,8 +628,18 @@ export default async function () {
         // Voice state update handler
         const voiceStateUpdateHandler = async ( oldState: VoiceState, newState: VoiceState ) => {
             try {
+                // Check if voiceTriggerNodes exists and has entries
+                if (!settings.voiceTriggerNodes || Object.keys(settings.voiceTriggerNodes).length === 0) {
+                    return;
+                }
+
                 // Check for voice trigger nodes
                 for ( const [ nodeId, parameters ] of Object.entries( settings.voiceTriggerNodes ) as [ string, any ] ) {
+                    // Skip if parameters is undefined or null
+                    if (!parameters) {
+                        console.warn(`Voice trigger node ${nodeId} has no parameters`);
+                        continue;
+                    }
                     // Check if this is the correct guild
                     if ( parameters.guildIds && parameters.guildIds.length && !parameters.guildIds.includes( newState.guild.id ) )
                         continue;
@@ -706,9 +716,16 @@ export default async function () {
                         }
                     } else if ( voiceMode === 'voice-recording' && newState.channelId && !oldState.channelId ) {
                         // User joined a voice channel - start recording if configured
+                        console.log(`User ${newState.member?.user.username} joined voice channel ${newState.channel?.name}`);
                         const autoJoin = parameters.additionalOptions?.autoJoin !== false;
+                        console.log(`Auto-join is ${autoJoin ? 'enabled' : 'disabled'}`);
                         if ( autoJoin && newState.channel ) {
+                            console.log(`Attempting to join voice channel and start recording...`);
                             await handleVoiceRecording( newState, nodeId, parameters );
+                        } else if (!autoJoin) {
+                            console.log(`Auto-join disabled, not joining voice channel`);
+                        } else if (!newState.channel) {
+                            console.log(`No voice channel found in newState`);
                         }
                     } else if ( voiceMode === 'voice-activity' ) {
                         // Handle voice activity detection
@@ -724,7 +741,12 @@ export default async function () {
         async function handleVoiceRecording( voiceState: VoiceState, nodeId: string, parameters: any ) {
             try {
                 const channel = voiceState.channel as VoiceChannel;
-                if ( !channel ) return;
+                if ( !channel ) {
+                    console.error('No voice channel found in voice state');
+                    return;
+                }
+
+                console.log(`handleVoiceRecording: Channel ${channel.name} (${channel.id}), Guild ${channel.guild.name} (${channel.guild.id})`);
 
                 const connectionKey = `${ voiceState.guild.id }:${ channel.id }`;
 
@@ -732,6 +754,7 @@ export default async function () {
                 let connection = settings.voiceConnections.get( connectionKey );
 
                 if ( !connection ) {
+                    console.log(`Creating new voice connection for ${connectionKey}`);
                     // Join the voice channel
                     connection = joinVoiceChannel( {
                         channelId: channel.id,
@@ -740,6 +763,7 @@ export default async function () {
                     } );
 
                     settings.voiceConnections.set( connectionKey, connection );
+                    console.log(`Voice connection created and stored`);
 
                     // Handle connection state
                     connection.on( VoiceConnectionStatus.Ready, () => {
@@ -853,13 +877,27 @@ export default async function () {
                         } );
                     } );
 
+                    connection.on( VoiceConnectionStatus.Signalling, () => {
+                        console.log( `Voice connection signalling for channel: ${ channel.name }` );
+                    } );
+
+                    connection.on( VoiceConnectionStatus.Connecting, () => {
+                        console.log( `Voice connection connecting to channel: ${ channel.name }` );
+                    } );
+
                     connection.on( VoiceConnectionStatus.Disconnected, async () => {
                         console.log( `Disconnected from voice channel: ${ channel.name }` );
                         settings.voiceConnections.delete( connectionKey );
                     } );
 
+                    connection.on( VoiceConnectionStatus.Destroyed, () => {
+                        console.log( `Voice connection destroyed for channel: ${ channel.name }` );
+                        settings.voiceConnections.delete( connectionKey );
+                    } );
+
                     connection.on( 'error', ( error: Error ) => {
                         console.error( 'Voice connection error:', error );
+                        console.error( 'Error stack:', error.stack );
                         if ( parameters.socket ) {
                             ipc.server.emit( parameters.socket, 'voiceError', {
                                 error: { message: error.message },
